@@ -1,5 +1,7 @@
 use serde::ser::SerializeMap;
 
+use crate::Error;
+
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct Function {
     pub name: String,
@@ -110,5 +112,92 @@ impl <'de> serde::Deserialize<'de> for Message {
         }
 
         deserializer.deserialize_map(MessageVisitor)
+    }
+}
+
+#[derive(Debug)]
+pub enum AssistantMessageDelta {
+    Content(String),
+    ToolCall(Vec<ToolCall>),
+}
+
+impl <'de> serde::Deserialize<'de> for AssistantMessageDelta {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de> 
+    {
+        struct DeltaVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for DeltaVisitor {
+            type Value = AssistantMessageDelta;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("assistant message delta")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>, 
+            {
+                let mut role = None;
+                let mut content = None;
+                let mut tool_calls: Option<Vec<ToolCall>> = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "role" => role = map.next_value()?,
+                        "content" => content = map.next_value()?,
+                        "tool_calls" => tool_calls = map.next_value()?,
+                        _ => return Err(serde::de::Error::unknown_field(key, &["role", "content", "tool_calls"])),
+                    }
+                }
+
+                let role: String = role.ok_or_else(|| serde::de::Error::missing_field("role"))?;
+
+                match (role.as_str(), content, tool_calls) {
+                    ("assistant", Some(content), None) => Ok(AssistantMessageDelta::Content(content)),
+                    ("assistant", None, Some(tool_calls)) => Ok(AssistantMessageDelta::ToolCall(tool_calls)),
+                    _ => Err(serde::de::Error::custom("invalid message")),
+                }
+            }
+        }
+
+        deserializer.deserialize_map(DeltaVisitor)
+    }
+}
+
+impl TryFrom<Vec<AssistantMessageDelta>> for Message {
+    type Error = Error;
+    
+    fn try_from(value: Vec<AssistantMessageDelta>) -> Result<Self, Self::Error> {
+        let mut message = None;
+        for delta in value {
+            match delta {
+                AssistantMessageDelta::Content(income) => {
+                    match message {
+                        Some(Message::Assistant(ref mut content)) => {
+                            content.push_str(&income);
+                        },
+                        None => {
+                            message = Some(Message::Assistant(income));
+                        },
+                        _ => return Err(Error::Conflict),
+                    }
+                },
+                AssistantMessageDelta::ToolCall(mut income) => {
+                    match message {
+                        Some(Message::ToolCall(ref mut tool_calls)) => {
+                            tool_calls.append(&mut income);
+                        },
+                        None => {
+                            message = Some(Message::ToolCall(income));
+                        },
+                        _ => return Err(Error::Conflict),
+                    }
+                }
+            }
+        }
+
+        message.ok_or(Error::EmptyDeltaList)
     }
 }
