@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::completions::completions::CompletionsRequestBuilder;
+use crate::chat::completions::completions::CompletionsRequestBuilder;
 
 pub struct Chat {
     api_key: Rc<RefCell<String>>,

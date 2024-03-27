@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::chat::Chat;
+use crate::chat::chat::Chat;
 
 pub struct OpenGLM {
     api_key: Rc<RefCell<String>>,

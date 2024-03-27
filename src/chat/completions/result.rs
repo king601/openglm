@@ -1,4 +1,4 @@
-use crate::message::{Message, AssistantMessageDelta};
+use crate::chat::message::{Message, AssistantMessageDelta};
 
 #[derive(serde::Deserialize, Debug)]
 pub struct CompletionResult<T> {

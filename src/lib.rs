@@ -1,18 +1,15 @@
 mod openglm;
 mod chat;
-mod message;
 mod send;
-mod completions;
-mod tools;
 mod error;
 mod authen;
 
 pub use openglm::*;
 pub use send::*;
-pub use tools::*;
+pub use chat::tools::*;
 pub use error::*;
-pub use message::*;
-pub use completions::{Unpack, RequestBuild};
+pub use chat::message::*;
+pub use chat::completions::{Unpack, RequestBuild};
 
 #[cfg(test)]
 mod tests {

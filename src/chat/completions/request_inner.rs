@@ -1,4 +1,4 @@
-use crate::{message::Message, tools::*};
+use crate::chat::{message::Message, tools::*};
 
 #[derive(serde::Serialize)]
 pub struct RequestInner {

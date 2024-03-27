@@ -23,9 +23,43 @@ pub struct ToolMessage {
 }
 
 #[derive(Debug)]
+pub enum ImageMessage {
+    Text(String),
+    ImageUrl(String),
+}
+
+// 使用一个辅助结构体来正确地序列化ImageUrl
+#[derive(serde::Serialize)]
+struct ImageUrlWrapper<'a> {
+    url: &'a str,
+}
+
+impl serde::Serialize for ImageMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(2))?;
+        match self {
+            ImageMessage::Text(text) => {
+                map.serialize_entry("type", "text")?;
+                map.serialize_entry("text", text)?;
+            },
+            ImageMessage::ImageUrl(url) => {
+                map.serialize_entry("type", "image_url")?;
+                map.serialize_entry("image_url", &ImageUrlWrapper { url: url })?;
+            },
+        }
+        map.end()
+    }
+
+}
+
+#[derive(Debug)]
 pub enum Message {
     System(String),
     User(String),
+    Image(Vec<ImageMessage>),
     Assistant(String),
     ToolCall(Vec<ToolCall>),
     Tool(ToolMessage),
@@ -45,6 +79,10 @@ impl serde::Serialize for Message {
             Message::User(content) => {
                 map.serialize_entry("role", "user")?;
                 map.serialize_entry("content", content)?;
+            },
+            Message::Image(images) => {
+                map.serialize_entry("role", "user")?;
+                map.serialize_entry("content", images)?;
             },
             Message::Assistant(content) => {
                 map.serialize_entry("role", "assistant")?;
@@ -84,7 +122,7 @@ impl <'de> serde::Deserialize<'de> for Message {
                 A: serde::de::MapAccess<'de>, 
             {
                 let mut role = None;
-                let mut content = None;
+                let mut content: Option<serde_json::Value> = None;
                 let mut tool_calls: Option<Vec<ToolCall>> = None;
                 let mut tool_call_id: Option<String> = None;
 
@@ -101,11 +139,38 @@ impl <'de> serde::Deserialize<'de> for Message {
                 let role: String = role.ok_or_else(|| serde::de::Error::missing_field("role"))?;
 
                 match (role.as_str(), content, tool_calls, tool_call_id) {
-                    ("system", Some(content), None, None) => Ok(Message::System(content)),
-                    ("user", Some(content), None, None) => Ok(Message::User(content)),
-                    ("assistant", Some(content), None, None) => Ok(Message::Assistant(content)),
+                    ("system", Some(serde_json::Value::String(content)), None, None) => Ok(Message::System(content)),
+                    ("user", Some(serde_json::Value::String(content)), None, None) => Ok(Message::User(content)),
+                    ("user", Some(serde_json::Value::Array(content)), None, None) => {
+                        let mut images = Vec::new();
+                        for image in content {
+                            let image = image.as_object().ok_or(serde::de::Error::custom("invalid image format"))?;
+                            match image.get("type") {
+                                Some(serde_json::Value::String(ty)) => {
+                                    match ty.as_str() {
+                                        "text" => {
+                                            let content = image.get("text").ok_or(serde::de::Error::custom("missing text field"))?;
+                                            let content = content.as_str().ok_or(serde::de::Error::custom("invalid text field"))?;
+                                            images.push(ImageMessage::Text(content.to_string()));
+                                        },
+                                        "image_url" => {
+                                            let image_url = image.get("image_url").ok_or(serde::de::Error::custom("missing image_url field"))?;
+                                            let image_url = image_url.as_object().ok_or(serde::de::Error::custom("invalid image_url field"))?;
+                                            let url = image_url.get("url").ok_or(serde::de::Error::custom("missing url field"))?;
+                                            let url = url.as_str().ok_or(serde::de::Error::custom("invalid url field"))?;
+                                            images.push(ImageMessage::ImageUrl(url.to_string()));
+                                        }
+                                        _ => return Err(serde::de::Error::custom("invalid image type")),
+                                    }
+                                },
+                                _ => return Err(serde::de::Error::custom("invalid image type")),
+                            }
+                        }
+                        Ok(Message::Image(images))
+                    },
+                    ("assistant", Some(serde_json::Value::String(content)), None, None) => Ok(Message::Assistant(content)),
                     ("assistant", None, Some(tool_calls), None) => Ok(Message::ToolCall(tool_calls)),
-                    ("tool", Some(content), None, Some(tool_call_id)) => Ok(Message::Tool(ToolMessage { content, tool_call_id })),
+                    ("tool", Some(serde_json::Value::String(content)), None, Some(tool_call_id)) => Ok(Message::Tool(ToolMessage { content, tool_call_id })),
                     _ => Err(serde::de::Error::custom("invalid message")),
                 }
             }
