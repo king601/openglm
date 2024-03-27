@@ -17,7 +17,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_chat() {
-        let client = OpenGLM::new("b0bd15d8b10aa938a9bb52faee28772f.iAPGMaNCsZzruiyK".to_string());
+        let client = OpenGLM::new("".to_string());
         let result = client.chat().completions().create()
             .with_model("glm-4".to_string())
             .add_message(Message::System("你是一个聪明且富有创造力的小说作家".to_string()))
@@ -28,7 +28,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stream_chat() {
-        let client = OpenGLM::new("b0bd15d8b10aa938a9bb52faee28772f.iAPGMaNCsZzruiyK".to_string());
+        let client = OpenGLM::new("".to_string());
         let mut result = client.chat().completions().create()
             .with_model("glm-4".to_string())
             .add_message(Message::System("你是一个聪明且富有创造力的小说作家".to_string()))
