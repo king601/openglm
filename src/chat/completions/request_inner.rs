@@ -1,9 +1,9 @@
-use crate::chat::{message::Message, tools::*};
+use crate::chat::{message::ChatMessage, tools::*};
 
 #[derive(serde::Serialize)]
 pub struct RequestInner {
     model: Option<String>,
-    messages: Option<Vec<Message>>,
+    messages: Option<Vec<ChatMessage>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     request_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -49,14 +49,14 @@ impl RequestInner {
         }
     }
 
-    pub(crate) fn with_messages(self, messages: Vec<Message>) -> Self {
+    pub(crate) fn with_messages(self, messages: Vec<ChatMessage>) -> Self {
         Self {
             messages: Some(messages),
             ..self
         }
     }
 
-    pub(crate) fn add_message(self, message: Message) -> Self {
+    pub(crate) fn add_message(self, message: ChatMessage) -> Self {
         let mut messages = self.messages.unwrap_or_default();
         messages.push(message);
 
@@ -155,8 +155,8 @@ pub trait Unpack {
 
 pub trait RequestBuild {
     fn with_model(self, model: String) -> Self;
-    fn with_messages(self, messages: Vec<Message>) -> Self;
-    fn add_message(self, message: Message) -> Self;
+    fn with_messages(self, messages: Vec<ChatMessage>) -> Self;
+    fn add_message(self, message: ChatMessage) -> Self;
     fn with_request_id(self, request_id: String) -> Self;
     fn with_do_sample(self, do_sample: bool) -> Self;
     fn with_temperature(self, temperature: f32) -> Self;
@@ -175,12 +175,12 @@ impl <T: Unpack> RequestBuild for T {
         Self::pack(inner.with_model(model), ext)
     }
 
-    fn with_messages(self, messages: Vec<Message>) -> Self {
+    fn with_messages(self, messages: Vec<ChatMessage>) -> Self {
         let (inner, ext) = self.unpack();
         Self::pack(inner.with_messages(messages), ext)
     }
 
-    fn add_message(self, message: Message) -> Self {
+    fn add_message(self, message: ChatMessage) -> Self {
         let (inner, ext) = self.unpack();
         Self::pack(inner.add_message(message), ext)
     }

@@ -1,4 +1,4 @@
-use crate::chat::message::{Message, AssistantMessageDelta};
+use crate::chat::message::{ChatMessage, AssistantMessageDelta};
 
 #[derive(serde::Deserialize, Debug)]
 pub struct CompletionResult<T> {
@@ -20,7 +20,7 @@ pub struct Usage {
 pub struct CompletionChoice {
     pub index: i32,
     pub finish_reason: String,
-    pub message: Message,
+    pub message: ChatMessage,
 }
 
 #[derive(Debug, serde::Deserialize)]

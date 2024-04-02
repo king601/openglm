@@ -1,7 +1,7 @@
 use serde_json::json;
 use bytes::BytesMut;
 
-use crate::{authen::generate, Error, Result, Sendable};
+use crate::{authen::generate, error::{Error, Result}, send::Sendable};
 
 use super::{request_inner::RequestInner, result::{CompletionChoiceDelta, CompletionResult}, Unpack};
 

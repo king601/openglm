@@ -1,6 +1,6 @@
 use serde::ser::SerializeMap;
 
-use crate::Error;
+use crate::error::Error;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct Function {
@@ -56,7 +56,7 @@ impl serde::Serialize for ImageMessage {
 }
 
 #[derive(Debug)]
-pub enum Message {
+pub enum ChatMessage {
     System(String),
     User(String),
     Image(Vec<ImageMessage>),
@@ -65,34 +65,34 @@ pub enum Message {
     Tool(ToolMessage),
 }
 
-impl serde::Serialize for Message {
+impl serde::Serialize for ChatMessage {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         let mut map = serializer.serialize_map(Some(2))?;
         match self {
-            Message::System(content) => {
+            ChatMessage::System(content) => {
                 map.serialize_entry("role", "system")?;
                 map.serialize_entry("content", content)?;
             },
-            Message::User(content) => {
+            ChatMessage::User(content) => {
                 map.serialize_entry("role", "user")?;
                 map.serialize_entry("content", content)?;
             },
-            Message::Image(images) => {
+            ChatMessage::Image(images) => {
                 map.serialize_entry("role", "user")?;
                 map.serialize_entry("content", images)?;
             },
-            Message::Assistant(content) => {
+            ChatMessage::Assistant(content) => {
                 map.serialize_entry("role", "assistant")?;
                 map.serialize_entry("content", content)?;
             },
-            Message::ToolCall(tool_calls) => {
+            ChatMessage::ToolCall(tool_calls) => {
                 map.serialize_entry("role", "assistant")?;
                 map.serialize_entry("tool_calls", tool_calls)?;
             },
-            Message::Tool(tool_message) => {
+            ChatMessage::Tool(tool_message) => {
                 map.serialize_entry("role", "tool")?;
                 map.serialize_entry("tool_call_id", &tool_message.tool_call_id)?;
                 map.serialize_entry("content", &tool_message.content)?;
@@ -103,7 +103,7 @@ impl serde::Serialize for Message {
     }
 }
 
-impl <'de> serde::Deserialize<'de> for Message {
+impl <'de> serde::Deserialize<'de> for ChatMessage {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -111,7 +111,7 @@ impl <'de> serde::Deserialize<'de> for Message {
         struct MessageVisitor;
 
         impl<'de> serde::de::Visitor<'de> for MessageVisitor {
-            type Value = Message;
+            type Value = ChatMessage;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("chat message")
@@ -139,8 +139,8 @@ impl <'de> serde::Deserialize<'de> for Message {
                 let role: String = role.ok_or_else(|| serde::de::Error::missing_field("role"))?;
 
                 match (role.as_str(), content, tool_calls, tool_call_id) {
-                    ("system", Some(serde_json::Value::String(content)), None, None) => Ok(Message::System(content)),
-                    ("user", Some(serde_json::Value::String(content)), None, None) => Ok(Message::User(content)),
+                    ("system", Some(serde_json::Value::String(content)), None, None) => Ok(ChatMessage::System(content)),
+                    ("user", Some(serde_json::Value::String(content)), None, None) => Ok(ChatMessage::User(content)),
                     ("user", Some(serde_json::Value::Array(content)), None, None) => {
                         let mut images = Vec::new();
                         for image in content {
@@ -166,11 +166,11 @@ impl <'de> serde::Deserialize<'de> for Message {
                                 _ => return Err(serde::de::Error::custom("invalid image type")),
                             }
                         }
-                        Ok(Message::Image(images))
+                        Ok(ChatMessage::Image(images))
                     },
-                    ("assistant", Some(serde_json::Value::String(content)), None, None) => Ok(Message::Assistant(content)),
-                    ("assistant", None, Some(tool_calls), None) => Ok(Message::ToolCall(tool_calls)),
-                    ("tool", Some(serde_json::Value::String(content)), None, Some(tool_call_id)) => Ok(Message::Tool(ToolMessage { content, tool_call_id })),
+                    ("assistant", Some(serde_json::Value::String(content)), None, None) => Ok(ChatMessage::Assistant(content)),
+                    ("assistant", None, Some(tool_calls), None) => Ok(ChatMessage::ToolCall(tool_calls)),
+                    ("tool", Some(serde_json::Value::String(content)), None, Some(tool_call_id)) => Ok(ChatMessage::Tool(ToolMessage { content, tool_call_id })),
                     _ => Err(serde::de::Error::custom("invalid message")),
                 }
             }
@@ -231,7 +231,7 @@ impl <'de> serde::Deserialize<'de> for AssistantMessageDelta {
     }
 }
 
-impl TryFrom<Vec<AssistantMessageDelta>> for Message {
+impl TryFrom<Vec<AssistantMessageDelta>> for ChatMessage {
     type Error = Error;
     
     fn try_from(value: Vec<AssistantMessageDelta>) -> Result<Self, Self::Error> {
@@ -240,22 +240,22 @@ impl TryFrom<Vec<AssistantMessageDelta>> for Message {
             match delta {
                 AssistantMessageDelta::Content(income) => {
                     match message {
-                        Some(Message::Assistant(ref mut content)) => {
+                        Some(ChatMessage::Assistant(ref mut content)) => {
                             content.push_str(&income);
                         },
                         None => {
-                            message = Some(Message::Assistant(income));
+                            message = Some(ChatMessage::Assistant(income));
                         },
                         _ => return Err(Error::Conflict),
                     }
                 },
                 AssistantMessageDelta::ToolCall(mut income) => {
                     match message {
-                        Some(Message::ToolCall(ref mut tool_calls)) => {
+                        Some(ChatMessage::ToolCall(ref mut tool_calls)) => {
                             tool_calls.append(&mut income);
                         },
                         None => {
-                            message = Some(Message::ToolCall(income));
+                            message = Some(ChatMessage::ToolCall(income));
                         },
                         _ => return Err(Error::Conflict),
                     }

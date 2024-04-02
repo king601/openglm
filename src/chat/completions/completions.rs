@@ -1,5 +1,5 @@
 use crate::authen::generate;
-use crate::Sendable;
+use crate::send::Sendable;
 use crate::error::{Result, Error};
 
 use super::request_inner::RequestInner;
