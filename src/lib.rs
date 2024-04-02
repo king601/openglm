@@ -1,8 +1,8 @@
-mod openglm;
-mod chat;
-mod send;
-mod error;
-mod authen;
+pub mod openglm;
+pub mod chat;
+pub mod send;
+pub mod error;
+pub mod authen;
 
 pub use openglm::*;
 pub use send::*;
